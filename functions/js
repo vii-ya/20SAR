@@ -1,39 +1,60 @@
-// api/stock.js
-// Vercel Serverless Function：代理 Yahoo Finance，解决 CORS
+// functions/api/stock.js
+// Cloudflare Pages Functions 写法
 
-export default async function handler(req, res) {
-    // 允许跨域
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET');
+export async function onRequest(context) {
+    const { request } = context;
+    const url = new URL(request.url);
+    const ticker = url.searchParams.get('ticker');
 
-    const { ticker } = req.query;
+    // 统一的 CORS 头
+    const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Content-Type': 'application/json'
+    };
 
+    // 处理预检请求
+    if (request.method === 'OPTIONS') {
+        return new Response(null, { headers: corsHeaders });
+    }
+
+    // 缺少 ticker 参数
     if (!ticker) {
-        return res.status(400).json({ error: '缺少 ticker 参数' });
+        return new Response(
+            JSON.stringify({ error: '缺少 ticker 参数' }),
+            { status: 400, headers: corsHeaders }
+        );
     }
 
     try {
-        // 拉取最近 1 年的日线数据
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}` +
-                    `?interval=1d&range=1y`;
+        // 拉取 Yahoo Finance 最近 1 年日线数据
+        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
 
-        const response = await fetch(url, {
+        const response = await fetch(yahooUrl, {
             headers: {
-                // Yahoo 有时会检查 User-Agent
                 'User-Agent': 'Mozilla/5.0 (compatible; StockDashboard/1.0)'
             }
         });
 
         if (!response.ok) {
-            return res.status(response.status).json({ error: 'Yahoo 请求失败' });
+            return new Response(
+                JSON.stringify({ error: `Yahoo 请求失败: ${response.status}` }),
+                { status: response.status, headers: corsHeaders }
+            );
         }
 
         const data = await response.json();
 
-        // 直接透传给前端
-        return res.status(200).json(data);
+        return new Response(JSON.stringify(data), {
+            status: 200,
+            headers: corsHeaders
+        });
 
     } catch (error) {
-        return res.status(500).json({ error: error.message });
+        return new Response(
+            JSON.stringify({ error: error.message }),
+            { status: 500, headers: corsHeaders }
+        );
     }
 }
