@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>20只护城河美股 · SAR青色/红色天数</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; }
+        body { background: #f5f8fc; padding: 24px; display: flex; justify-content: center; min-height: 100vh; }
+        .dashboard { max-width: 1500px; width: 100%; background: white; border-radius: 28px; box-shadow: 0 20px 40px -12px rgba(0,20,30,0.15); padding: 28px 30px 35px; }
+        .header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+        .title h1 { font-size: 1.8rem; font-weight: 600; color: #0b1b2b; display: flex; align-items: center; gap: 10px; }
+        .title h1 i { color: #2a7faa; }
+        .title .sub { color: #536e7e; font-size: 0.92rem; margin-top: 4px; }
+        .search-area { display: flex; align-items: center; gap: 10px; background: #eef3f8; padding: 6px 6px 6px 18px; border-radius: 60px; }
+        .search-area i { color: #3a6e8c; }
+        .search-area input { border: none; background: transparent; font-size: 0.95rem; padding: 10px 0; width: 150px; outline: none; font-weight: 500; }
+        .search-area button { background: #0f2b3c; border: none; color: white; font-weight: 600; padding: 10px 22px; border-radius: 40px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
+        .search-area button:hover { background: #1d4b63; }
+
+        .summary-cards { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+        .card { background: #f9fcff; border: 1px solid #e3ecf3; border-radius: 18px; padding: 16px 22px; flex: 1 1 180px; display: flex; align-items: center; gap: 16px; }
+        .card-icon { width: 44px; height: 44px; background: #e2eef9; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #1f688b; font-size: 1.2rem; }
+        .card-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; color: #6f8b9c; }
+        .card-value { font-size: 1.6rem; font-weight: 700; color: #0b1b2b; line-height: 1.1; }
+        .card-value small { font-size: 0.85rem; font-weight: 500; color: #4b6f84; }
+
+        .table-wrap { border-radius: 18px; border: 1px solid #e2eaf1; overflow-x: auto; background: white; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 1000px; white-space: nowrap; }
+        th { text-align: left; padding: 14px 12px; background: #f4f9ff; font-weight: 600; color: #1d4359; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #d0e0ec; }
+        td { padding: 12px 12px; border-bottom: 1px solid #ecf2f8; color: #17394d; font-weight: 500; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #fafdff; }
+        .trend-up { color: #1e7b4c; font-weight: 600; }
+        .trend-down { color: #b13e3e; font-weight: 600; }
+        .cyan-badge { display: inline-flex; align-items: center; gap: 5px; background: #dff3fc; color: #0a5b7a; padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.78rem; }
+        .red-badge { display: inline-flex; align-items: center; gap: 5px; background: #fde7e7; color: #a13e3e; padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.78rem; }
+        .dot-cyan { width: 8px; height: 8px; border-radius: 50%; background: #27b0d9; display: inline-block; }
+        .dot-red { width: 8px; height: 8px; border-radius: 50%; background: #d94a4a; display: inline-block; }
+        .sar-value { font-family: 'SF Mono', monospace; font-weight: 600; color: #1a516b; }
+        .loading { text-align: center; padding: 40px; color: #6f8b9c; }
+        .note { margin-top: 18px; font-size: 0.8rem; color: #678396; display: flex; justify-content: space-between; }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <div class="header">
+        <div class="title">
+            <h1><i class="fas fa-shield-halved"></i> 20只护城河美股 · SAR趋势天数</h1>
+            <div class="sub"><i class="fas fa-sync-alt"></i> 真实数据来自 Yahoo Finance</div>
+        </div>
+        <div class="search-area">
+            <i class="fas fa-search"></i>
+            <input type="text" id="tickerInput" placeholder="输入代号 (如 MSFT)" value="MSFT">
+            <button id="loadBtn"><i class="fas fa-arrow-right"></i> 查看</button>
+        </div>
+    </div>
+
+    <div class="summary-cards" id="summaryCards"></div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>股票</th>
+                    <th>公司</th>
+                    <th>最新收盘</th>
+                    <th>SAR 值</th>
+                    <th>趋势</th>
+                    <th>青色 / 红色天数</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr><td colspan="6" class="loading"><i class="fas fa-spinner fa-spin"></i> 加载中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="note">
+        <span><i class="fas fa-circle-info"></i> 青色天数 = 连续上升天数；红色天数 = 连续下降天数。数据来自 Yahoo Finance。</span>
+        <span id="lastUpdated"></span>
+    </div>
+</div>
+
+<script>
+    // ========== 20只宽护城河美股 ==========
+    const MOAT_STOCKS = [
+        { ticker: 'MSFT',  name: 'Microsoft' },
+        { ticker: 'GOOGL', name: 'Alphabet' },
+        { ticker: 'AAPL',  name: 'Apple' },
+        { ticker: 'AMZN',  name: 'Amazon' },
+        { ticker: 'V',     name: 'Visa' },
+        { ticker: 'MA',    name: 'Mastercard' },
+        { ticker: 'MCO',   name: "Moody's" },
+        { ticker: 'SPGI',  name: 'S&P Global' },
+        { ticker: 'BRK-B', name: 'Berkshire Hathaway' },
+        { ticker: 'ASML',  name: 'ASML Holding' },
+        { ticker: 'AMAT',  name: 'Applied Materials' },
+        { ticker: 'TXN',   name: 'Texas Instruments' },
+        { ticker: 'MRVL',  name: 'Marvell Technology' },
+        { ticker: 'AVGO',  name: 'Broadcom' },
+        { ticker: 'NVDA',  name: 'NVIDIA' },
+        { ticker: 'CRWD',  name: 'CrowdStrike' },
+        { ticker: 'PLTR',  name: 'Palantir' },
+        { ticker: 'CRDO',  name: 'Credo Technology' },
+        { ticker: 'URI',   name: 'United Rentals' },
+        { ticker: 'LLY',   name: 'Eli Lilly' }
+    ];
+
+    // ========== SAR 计算（标准抛物线算法）==========
+    function calculateSAR(highs, lows, closes, afStep = 0.02, maxAF = 0.20) {
+        const n = closes.length;
+        if (n < 2) return [];
+
+        const sar = new Array(n).fill(0);
+        const trend = new Array(n).fill('上升'); // 上升/下降
+        const af = new Array(n).fill(afStep);
+        let isUp = true;
+        let ep = highs[0];       // 极值点
+        let sarValue = lows[0];  // 初始 SAR
+        let currentAF = afStep;
+
+        for (let i = 1; i < n; i++) {
+            // 计算新 SAR
+            let newSar = sarValue + currentAF * (ep - sarValue);
+
+            if (isUp) {
+                // 上升趋势：SAR 不能高于前两日最低价
+                if (i >= 2) newSar = Math.min(newSar, lows[i-1], lows[i-2]);
+                else newSar = Math.min(newSar, lows[i-1]);
+
+                if (lows[i] < newSar) {
+                    // 反转：转下降
+                    isUp = false;
+                    newSar = ep;
+                    ep = lows[i];
+                    currentAF = afStep;
+                } else {
+                    if (highs[i] > ep) {
+                        ep = highs[i];
+                        currentAF = Math.min(currentAF + afStep, maxAF);
+                    }
+                }
+            } else {
+                // 下降趋势：SAR 不能低于前两日最高价
+                if (i >= 2) newSar = Math.max(newSar, highs[i-1], highs[i-2]);
+                else newSar = Math.max(newSar, highs[i-1]);
+
+                if (highs[i] > newSar) {
+                    // 反转：转上升
+                    isUp = true;
+                    newSar = ep;
+                    ep = highs[i];
+                    currentAF = afStep;
+                } else {
+                    if (lows[i] < ep) {
+                        ep = lows[i];
+                        currentAF = Math.min(currentAF + afStep, maxAF);
+                    }
+                }
+            }
+
+            sarValue = newSar;
+            sar[i] = sarValue;
+            trend[i] = isUp ? '上升' : '下降';
+            af[i] = currentAF;
+        }
+
+        // 第一天用初始值
+        sar[0] = lows[0];
+        trend[0] = '上升';
+        af[0] = afStep;
+
+        return { sar, trend, af };
+    }
+
+    // ========== 计算连续青色/红色天数 ==========
+    function calculateStreaks(trends) {
+        const cyanDays = new Array(trends.length).fill(0);
+        const redDays = new Array(trends.length).fill(0);
+        let cyanCount = 0;
+        let redCount = 0;
+
+        for (let i = 0; i < trends.length; i++) {
+            if (trends[i] === '上升') {
+                cyanCount++;
+                redCount = 0;
+            } else {
+                redCount++;
+                cyanCount = 0;
+            }
+            cyanDays[i] = cyanCount;
+            redDays[i] = redCount;
+        }
+        return { cyanDays, redDays };
+    }
+
+    // ========== 从 Yahoo 拉取数据并计算 ==========
+    async function fetchStockData(ticker) {
+        const response = await fetch(`/api/stock?ticker=${ticker}`);
+        if (!response.ok) throw new Error(`请求失败: ${response.status}`);
+
+        const data = await response.json();
+        const result = data.chart.result[0];
+        const timestamps = result.timestamp;
+        const quote = result.indicators.quote[0];
+
+        // 过滤掉 null 值
+        const valid = [];
+        for (let i = 0; i < timestamps.length; i++) {
+            if (quote.close[i] != null && quote.high[i] != null && quote.low[i] != null) {
+                valid.push({
+                    date: new Date(timestamps[i] * 1000),
+                    open: quote.open[i],
+                    high: quote.high[i],
+                    low: quote.low[i],
+                    close: quote.close[i],
+                    volume: quote.volume[i]
+                });
+            }
+        }
+
+        const highs = valid.map(d => d.high);
+        const lows = valid.map(d => d.low);
+        const closes = valid.map(d => d.close);
+
+        const { sar, trend, af } = calculateSAR(highs, lows, closes);
+        const { cyanDays, redDays } = calculateStreaks(trend);
+
+        return valid.map((d, i) => ({
+            date: d.date.toLocaleDateString(),
+            close: d.close,
+            sar: sar[i],
+            trend: trend[i],
+            af: af[i],
+            cyan: cyanDays[i],
+            red: redDays[i]
+        }));
+    }
+
+    // ========== 渲染表格 ==========
+    async function renderAllStocks() {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '<tr><td colspan="6" class="loading"><i class="fas fa-spinner fa-spin"></i> 正在拉取 20 只股票数据...</td></tr>';
+
+        const rows = [];
+
+        for (const stock of MOAT_STOCKS) {
+            try {
+                const history = await fetchStockData(stock.ticker);
+                const last = history[history.length - 1];
+                rows.push({ stock, last });
+            } catch (e) {
+                rows.push({ stock, last: null, error: e.message });
+            }
+            // 延迟 500ms 避免被限流
+            await new Promise(r => setTimeout(r, 500));
+        }
+
+        tbody.innerHTML = '';
+
+        rows.forEach(({ stock, last, error }) => {
+            const tr = document.createElement('tr');
+            if (error || !last) {
+                tr.innerHTML = `
+                    <td><strong>${stock.ticker}</strong></td>
+                    <td>${stock.name}</td>
+                    <td colspan="4" style="color:#b13e3e;">加载失败：${error || '无数据'}</td>
+                `;
+            } else {
+                const trendClass = last.trend === '上升' ? 'trend-up' : 'trend-down';
+                const daysHtml = last.trend === '上升'
+                    ? `<span class="cyan-badge"><span class="dot-cyan"></span> 青色第 ${last.cyan} 天</span>`
+                    : `<span class="red-badge"><span class="dot-red"></span> 红色第 ${last.red} 天</span>`;
+                tr.innerHTML = `
+                    <td><strong>${stock.ticker}</strong></td>
+                    <td>${stock.name}</td>
+                    <td>${last.close.toFixed(2)}</td>
+                    <td class="sar-value">${last.sar.toFixed(2)}</td>
+                    <td><span class="${trendClass}">${last.trend}</span></td>
+                    <td>${daysHtml}</td>
+                `;
+            }
+            tbody.appendChild(tr);
+        });
+
+        updateTimestamp();
+    }
+
+    // ========== 渲染顶部卡片 ==========
+    async function renderSummary(ticker) {
+        const container = document.getElementById('summaryCards');
+        container.innerHTML = '<div class="card"><div class="card-value"><i class="fas fa-spinner fa-spin"></i> 加载中...</div></div>';
+
+        try {
+            const history = await fetchStockData(ticker);
+            const last = history[history.length - 1];
+            const stock = MOAT_STOCKS.find(s => s.ticker === ticker) || { name: ticker };
+            const trendClass = last.trend === '上升' ? 'trend-up' : 'trend-down';
+            const daysHtml = last.trend === '上升'
+                ? `<span class="cyan-badge"><span class="dot-cyan"></span> 青色第 ${last.cyan} 天</span>`
+                : `<span class="red-badge"><span class="dot-red"></span> 红色第 ${last.red} 天</span>`;
+
+            container.innerHTML = `
+                <div class="card">
+                    <div class="card-icon"><i class="fas fa-tag"></i></div>
+                    <div>
+                        <div class="card-label">当前查询</div>
+                        <div class="card-value">${ticker} <small>${stock.name}</small></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon"><i class="fas fa-dollar-sign"></i></div>
+                    <div>
+                        <div class="card-label">最新收盘</div>
+                        <div class="card-value">${last.close.toFixed(2)} <small class="${trendClass}">${last.trend}</small></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon"><i class="fas fa-wave-square"></i></div>
+                    <div>
+                        <div class="card-label">SAR 值</div>
+                        <div class="card-value">${last.sar.toFixed(2)}</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon"><i class="fas fa-water"></i></div>
+                    <div>
+                        <div class="card-label">连续天数</div>
+                        <div class="card-value">${daysHtml}</div>
+                    </div>
+                </div>
+            `;
+        } catch (e) {
+            container.innerHTML = `<div class="card"><div class="card-value" style="color:#b13e3e;">加载失败: ${e.message}</div></div>`;
+        }
+    }
+
+    function updateTimestamp() {
+        const now = new Date();
+        document.getElementById('lastUpdated').innerHTML =
+            `<i class="far fa-clock"></i> 更新: ${now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}`;
+    }
+
+    function loadTicker(ticker) {
+        ticker = ticker.trim().toUpperCase();
+        if (!ticker) ticker = 'MSFT';
+        document.getElementById('tickerInput').value = ticker;
+        renderSummary(ticker);
+        renderAllStocks();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadTicker('MSFT');
+        document.getElementById('loadBtn').addEventListener('click', () => {
+            loadTicker(document.getElementById('tickerInput').value);
+        });
+        document.getElementById('tickerInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') loadTicker(e.target.value);
+        });
+    });
+</script>
+</body>
+</html>
